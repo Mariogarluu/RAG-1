@@ -59,4 +59,12 @@ RESPUESTA:"""
     return llm.invoke(prompt).content
 
 if __name__ == "__main__":
-    print(rag("¿Qué es un Sistema Informático de Facturación?"))
+    # Resumen en una frase del tema del documento
+    resumen_tema = rag("¿De qué trata este documento en general? Resúmelo en una sola frase concisa.")
+    print(f"Resumen del documento:\n{resumen_tema}\n")
+
+    # Pregunta interactiva al usuario
+    pregunta_usuario = input("Introduce tu pregunta sobre el documento: ")
+    if pregunta_usuario.strip():
+        respuesta = rag(pregunta_usuario)
+        print(f"\nRespuesta:\n{respuesta}")
