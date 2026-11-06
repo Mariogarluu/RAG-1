@@ -7,31 +7,41 @@ from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 from langchain_groq import ChatGroq
 
-# Cargar variables de entorno desde .env
+# Cargar variables de entorno (.env)
 load_dotenv()
 
-# 1. Cargar PDF directamente con pypdf
-reader = pypdf.PdfReader("Preguntas_frecuentes__FAQ_.pdf")
-docs = [
-    Document(
-        page_content=page.extract_text() or "",
-        metadata={"source": "Preguntas_frecuentes__FAQ_.pdf", "page": i}
-    )
-    for i, page in enumerate(reader.pages)
-]
-
-# 2. Trocear en chunks de ~800 caracteres
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=800, chunk_overlap=100)
-chunks = splitter.split_documents(docs)
-
-# 3. Embeddings (Ollama nomic-embed-text) + vectorstore persistente (Chroma)
+CHROMA_PATH = "./chroma_db"
 embeddings = OllamaEmbeddings(model="nomic-embed-text")
-vectorstore = Chroma.from_documents(
-    chunks, embeddings,
-    persist_directory="./chroma_db")
 
-# 4. LLM con Groq usando la variable de entorno GROQ_API_KEY
+# 1. Cargar o crear el vectorstore (si ya existe en disco, se reutiliza)
+if os.path.exists(CHROMA_PATH) and os.listdir(CHROMA_PATH):
+    vectorstore = Chroma(
+        persist_directory=CHROMA_PATH,
+        embedding_function=embeddings
+    )
+else:
+    # Cargar PDF con pypdf
+    reader = pypdf.PdfReader("Preguntas_frecuentes__FAQ_.pdf")
+    docs = [
+        Document(
+            page_content=page.extract_text() or "",
+            metadata={"source": "Preguntas_frecuentes__FAQ_.pdf", "page": i}
+        )
+        for i, page in enumerate(reader.pages)
+    ]
+
+    # Trocear en chunks de ~800 caracteres
+    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+    chunks = splitter.split_documents(docs)
+
+    # Crear y persistir el vectorstore
+    vectorstore = Chroma.from_documents(
+        chunks,
+        embeddings,
+        persist_directory=CHROMA_PATH
+    )
+
+# 2. LLM con Groq
 llm = ChatGroq(model="qwen/qwen3.8-27b", temperature=0)
 
 def rag(pregunta: str) -> str:
@@ -48,4 +58,5 @@ PREGUNTA: {pregunta}
 RESPUESTA:"""
     return llm.invoke(prompt).content
 
-print(rag("¿Qué es un Sistema Informático de Facturación?"))
+if __name__ == "__main__":
+    print(rag("¿Qué es un Sistema Informático de Facturación?"))
